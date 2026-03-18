@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Calendrier{% endblock %}
+{% block title %}Calendar{% endblock %}
 
 {% block content %}
 <div class="calendar-container">
     <header class="app-header">
         <h1>Family House</h1>
-        <button onclick="logout()" class="btn btn-logout">Déconnexion</button>
+        <button onclick="logout()" class="btn btn-logout">Logout</button>
     </header>
     
     <div class="calendar-section">
-        <h2>Calendrier des réservations</h2>
+        <h2>Booking Calendar</h2>
         
         <div class="calendar-controls">
-            <button onclick="previousMonth()" class="btn btn-nav">‹ Précédent</button>
-            <h3 id="current-month">Janvier 2026</h3>
-            <button onclick="nextMonth()" class="btn btn-nav">Suivant ›</button>
+            <button onclick="previousMonth()" class="btn btn-nav">‹ Previous</button>
+            <h3 id="current-month">January 2026</h3>
+            <button onclick="nextMonth()" class="btn btn-nav">Next ›</button>
         </div>
         
         <div id="calendar-grid" class="calendar-grid">
@@ -24,7 +24,7 @@
     </div>
     
     <div class="bookings-section">
-        <h2>Prochaines réservations</h2>
+        <h2>Upcoming Bookings</h2>
         <div id="bookings-list" class="bookings-list">
             <!-- Bookings will be loaded here -->
         </div>
@@ -97,8 +97,8 @@ function renderCalendar() {
     const month = currentMonth.getMonth();
     
     // Update month title
-    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-                       'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                       'July', 'August', 'September', 'October', 'November', 'December'];
     document.getElementById('current-month').textContent = `${monthNames[month]} ${year}`;
     
     // Get first day of month and number of days
@@ -117,7 +117,7 @@ function renderCalendar() {
     
     // Nights of month - each cell represents a night from day N to day N+1
     const today = new Date();
-    const weekdays = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     
     for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month, day);
@@ -162,17 +162,17 @@ function renderCalendar() {
                     html += `<span class="booking-name">${booking.name}</span>`;
                     html += ` <span class="booking-guests">(${booking.guests})</span>`;
                     if (booking.is_request) {
-                        html += ` <span class="request-badge">demande</span>`;
+                        html += ` <span class="request-badge">request</span>`;
                     }
                     html += `</div>`;
                 }
             });
             if (allDayBookings.length > 2) {
-                html += `<div class="booking-more">+${allDayBookings.length - 2} autre(s)</div>`;
+                html += `<div class="booking-more">+${allDayBookings.length - 2} other(s)</div>`;
             }
-            let capacityText = `${totalGuests}/15 pers.`;
+            let capacityText = `${totalGuests}/15 guests`;
             if (requestGuests > 0) {
-                capacityText += ` (+${requestGuests} demande)`;
+                capacityText += ` (+${requestGuests} request)`;
             }
             html += `<div class="booking-capacity">${capacityText}</div>`;
             html += `</div>`;
@@ -196,7 +196,7 @@ function renderBookingsList() {
     
     let html = '';
     if (upcomingBookings.length === 0) {
-        html = '<p class="no-bookings">Aucune réservation à venir</p>';
+        html = '<p class="no-bookings">No upcoming bookings</p>';
     } else {
         upcomingBookings.forEach(booking => {
             const checkIn = parseLocalDate(booking.check_in_date);
@@ -207,17 +207,17 @@ function renderBookingsList() {
                 <div class="booking-item${requestClass}">
                     <div class="booking-date">
                         ${formatDateLong(checkIn)} → ${formatDateLong(checkOut)}
-                        <br><small>(${nights} nuit${nights > 1 ? 's' : ''})</small>
-                        ${booking.is_request ? '<br><span class="request-badge-large">DEMANDE</span>' : ''}
+                        <br><small>(${nights} night${nights > 1 ? 's' : ''})</small>
+                        ${booking.is_request ? '<br><span class="request-badge-large">REQUEST</span>' : ''}
                     </div>
                     <div class="booking-details">
-                        <strong>${booking.name}</strong> - ${booking.guests} personne${booking.guests > 1 ? 's' : ''}
+                        <strong>${booking.name}</strong> - ${booking.guests} person${booking.guests > 1 ? 's' : ''}
                         ${booking.comment ? `<br><em class="booking-comment">${booking.comment}</em>` : ''}
                     </div>
                     <div class="booking-actions">
-                        ${booking.is_request ? `<button onclick="confirmBooking(${booking.id})" class="btn btn-confirm">Confirmer</button>` : ''}
-                        <button onclick="editBooking(${booking.id})" class="btn btn-edit">Modifier</button>
-                        <button onclick="deleteBooking(${booking.id})" class="btn btn-delete">Supprimer</button>
+                        ${booking.is_request ? `<button onclick="confirmBooking(${booking.id})" class="btn btn-confirm">Confirm</button>` : ''}
+                        <button onclick="editBooking(${booking.id})" class="btn btn-edit">Edit</button>
+                        <button onclick="deleteBooking(${booking.id})" class="btn btn-delete">Delete</button>
                     </div>
                 </div>
             `;
@@ -235,7 +235,7 @@ function selectDate(dateStr) {
     
     // Don't allow booking past dates
     if (date < today) {
-        alert('Impossible de réserver une date passée');
+        alert('Cannot book a past date');
         return;
     }
     
@@ -265,15 +265,15 @@ function showDayDetailsModal(dateStr, dayBookings) {
     let html = `
         <div class="modal-content">
             <span class="close" onclick="closeModal()">&times;</span>
-            <h2>Réservations pour la nuit du ${formatDateLong(date)}</h2>
+            <h2>Bookings for the night of ${formatDateLong(date)}</h2>
             
             <div class="day-summary">
-                <p><strong>Capacité:</strong> ${totalGuests}/15 personnes (${remaining} place(s) restante(s))</p>
-                ${requestGuests > 0 ? `<p><strong>Demandes:</strong> ${requestGuests} personne(s) en demande</p>` : ''}
+                <p><strong>Capacity:</strong> ${totalGuests}/15 people (${remaining} spot(s) remaining)</p>
+                ${requestGuests > 0 ? `<p><strong>Requests:</strong> ${requestGuests} person(s) requesting</p>` : ''}
             </div>
             
             <div class="day-bookings-list">
-                <h3>Réservations:</h3>
+                <h3>Bookings:</h3>
     `;
     
     dayBookings.forEach(booking => {
@@ -284,15 +284,15 @@ function showDayDetailsModal(dateStr, dayBookings) {
         html += `
             <div class="day-booking-item${requestClass}">
                 <div>
-                    <strong>${booking.name}</strong> - ${booking.guests} personne${booking.guests > 1 ? 's' : ''}
-                    ${booking.is_request ? '<span class="request-badge-large">DEMANDE</span>' : ''}
-                    <br><small>Du ${formatDateLong(checkIn)} au ${formatDateLong(checkOut)} (${nights} nuit${nights > 1 ? 's' : ''})</small>
+                    <strong>${booking.name}</strong> - ${booking.guests} person${booking.guests > 1 ? 's' : ''}
+                    ${booking.is_request ? '<span class="request-badge-large">REQUEST</span>' : ''}
+                    <br><small>From ${formatDateLong(checkIn)} to ${formatDateLong(checkOut)} (${nights} night${nights > 1 ? 's' : ''})</small>
                     ${booking.comment ? `<br><em class="booking-comment">${booking.comment}</em>` : ''}
                 </div>
                 <div class="booking-actions">
-                    ${booking.is_request ? `<button onclick="confirmBookingFromDay(${booking.id})" class="btn btn-confirm">Confirmer</button>` : ''}
-                    <button onclick="editBookingFromDay(${booking.id})" class="btn btn-edit">Modifier</button>
-                    <button onclick="deleteBookingFromDay(${booking.id})" class="btn btn-delete">Supprimer</button>
+                    ${booking.is_request ? `<button onclick="confirmBookingFromDay(${booking.id})" class="btn btn-confirm">Confirm</button>` : ''}
+                    <button onclick="editBookingFromDay(${booking.id})" class="btn btn-edit">Edit</button>
+                    <button onclick="deleteBookingFromDay(${booking.id})" class="btn btn-delete">Delete</button>
                 </div>
             </div>
         `;
@@ -304,7 +304,7 @@ function showDayDetailsModal(dateStr, dayBookings) {
         html += `
             <div class="modal-actions">
                 <button onclick="showBookingModal('${dateStr}')" class="btn btn-primary">
-                    Ajouter une réservation
+                    Add a booking
                 </button>
             </div>
         `;
@@ -326,7 +326,7 @@ function showBookingModal(checkInDateStr, bookingId = null) {
     if (bookingId) {
         booking = bookings.find(b => b.id === bookingId);
         if (!booking) {
-            alert('Réservation non trouvée');
+            alert('Booking not found');
             return;
         }
         checkInDate = parseLocalDate(booking.check_in_date);
@@ -341,8 +341,8 @@ function showBookingModal(checkInDateStr, bookingId = null) {
         checkOutDateStr = formatDate(checkOutDate);
     }
     
-    const title = bookingId ? 'Modifier la réservation' : 'Nouvelle réservation';
-    const submitLabel = bookingId ? 'Mettre à jour' : 'Réserver';
+    const title = bookingId ? 'Edit booking' : 'New booking';
+    const submitLabel = bookingId ? 'Update' : 'Book';
     const isRequest = booking ? booking.is_request : false;
     const bookingIdParam = bookingId !== undefined && bookingId !== null ? String(bookingId) : 'null';
     
@@ -354,7 +354,7 @@ function showBookingModal(checkInDateStr, bookingId = null) {
             
             <form id="booking-form" onsubmit="submitBooking(event, ${bookingIdParam})">
                 <div class="form-group">
-                    <label for="booking-check-in">Date d'arrivée</label>
+                    <label for="booking-check-in">Check-in date</label>
                     <input 
                         type="date" 
                         id="booking-check-in" 
@@ -366,7 +366,7 @@ function showBookingModal(checkInDateStr, bookingId = null) {
                 </div>
                 
                 <div class="form-group">
-                    <label for="booking-check-out">Date de départ</label>
+                    <label for="booking-check-out">Check-out date</label>
                     <input 
                         type="date" 
                         id="booking-check-out" 
@@ -378,23 +378,23 @@ function showBookingModal(checkInDateStr, bookingId = null) {
                 </div>
                 
                 <div id="capacity-info" class="capacity-info">
-                    <p><em>Sélectionnez les dates pour voir la disponibilité</em></p>
+                    <p><em>Select dates to see availability</em></p>
                 </div>
                 
                 <div class="form-group">
-                    <label for="booking-name">Nom</label>
+                    <label for="booking-name">Name</label>
                     <input 
                         type="text" 
                         id="booking-name" 
                         name="name" 
                         required
-                        placeholder="Votre nom"
+                        placeholder="Your name"
                         value="${booking ? booking.name : ''}"
                     >
                 </div>
                 
                 <div class="form-group">
-                    <label for="booking-guests">Nombre de personnes</label>
+                    <label for="booking-guests">Number of guests</label>
                     <input 
                         type="number" 
                         id="booking-guests" 
@@ -408,12 +408,12 @@ function showBookingModal(checkInDateStr, bookingId = null) {
                 </div>
                 
                 <div class="form-group">
-                    <label for="booking-comment">Commentaire (Optionnel)</label>
+                    <label for="booking-comment">Comment (Optional)</label>
                     <textarea 
                         id="booking-comment" 
                         name="comment" 
                         rows="3"
-                        placeholder="Ajoutez un commentaire..."
+                        placeholder="Add a comment..."
                     >${booking ? (booking.comment || '') : ''}</textarea>
                 </div>
                 
@@ -426,12 +426,12 @@ function showBookingModal(checkInDateStr, bookingId = null) {
                             ${isRequest ? 'checked' : ''}
                             onchange="updateCapacityInfo(${bookingIdParam})"
                         >
-                        <span>Enregistrer comme demande (ne compte pas dans la capacité)</span>
+                        <span>Save as request (doesn't count against capacity)</span>
                     </label>
                 </div>
                 
                 <div class="modal-actions">
-                    <button type="button" onclick="closeModal()" class="btn btn-secondary">Annuler</button>
+                    <button type="button" onclick="closeModal()" class="btn btn-secondary">Cancel</button>
                     <button type="submit" class="btn btn-primary">${submitLabel}</button>
                 </div>
             </form>
@@ -462,7 +462,7 @@ function updateCapacityInfo(excludeBookingId = null) {
     
     // Validate dates
     if (checkOutDate <= checkInDate) {
-        capacityInfoDiv.innerHTML = '<p class="error">La date de départ doit être après la date d\'arrivée</p>';
+        capacityInfoDiv.innerHTML = '<p class="error">Check-out date must be after check-in date</p>';
         guestsInput.max = 0;
         return;
     }
@@ -472,8 +472,8 @@ function updateCapacityInfo(excludeBookingId = null) {
     // If it's a request, capacity is not checked
     if (isRequest) {
         capacityInfoDiv.innerHTML = `
-            <p><strong>${nights} nuit${nights > 1 ? 's' : ''}</strong></p>
-            <p class="info-message">Mode demande : la capacité n'est pas vérifiée</p>
+            <p><strong>${nights} night${nights > 1 ? 's' : ''}</strong></p>
+            <p class="info-message">Request mode: capacity is not checked</p>
         `;
         guestsInput.max = 15;
         return;
@@ -510,13 +510,13 @@ function updateCapacityInfo(excludeBookingId = null) {
     
     if (minCapacity > 0) {
         capacityInfoDiv.innerHTML = `
-            <p><strong>${nights} nuit${nights > 1 ? 's' : ''}</strong></p>
-            <p><strong>Places disponibles:</strong> ${minCapacity}/15 (minimum sur toutes les nuits)</p>
+            <p><strong>${nights} night${nights > 1 ? 's' : ''}</strong></p>
+            <p><strong>Available spots:</strong> ${minCapacity}/15 (minimum across all nights)</p>
         `;
     } else {
         capacityInfoDiv.innerHTML = `
-            <p><strong>${nights} nuit${nights > 1 ? 's' : ''}</strong></p>
-            <p class="error">Aucune place disponible pour cette période</p>
+            <p><strong>${nights} night${nights > 1 ? 's' : ''}</strong></p>
+            <p class="error">No spots available for this period</p>
         `;
     }
 }
@@ -534,13 +534,13 @@ async function submitBooking(event, bookingId = null) {
     
     // Validate dates
     if (parseLocalDate(checkOutDate) <= parseLocalDate(checkInDate)) {
-        alert('La date de départ doit être après la date d\'arrivée');
+        alert('Check-out date must be after check-in date');
         return;
     }
     
     const method = bookingId ? 'PUT' : 'POST';
     const url = bookingId ? `/api/bookings/${bookingId}` : '/api/bookings';
-    const successMessage = bookingId ? 'Réservation modifiée avec succès !' : 'Réservation créée avec succès !';
+    const successMessage = bookingId ? 'Booking updated successfully!' : 'Booking created successfully!';
     
     try {
         const response = await fetch(url, {
@@ -564,11 +564,11 @@ async function submitBooking(event, bookingId = null) {
             alert(successMessage);
         } else {
             const error = await response.json();
-            alert(error.error || 'Erreur lors de la sauvegarde de la réservation');
+            alert(error.error || 'Error saving the booking');
         }
     } catch (error) {
         console.error('Error saving booking:', error);
-        alert('Erreur lors de la sauvegarde de la réservation');
+        alert('Error saving the booking');
     }
 }
 
@@ -576,7 +576,7 @@ async function submitBooking(event, bookingId = null) {
 function editBooking(bookingId) {
     const booking = bookings.find(b => b.id === bookingId);
     if (!booking) {
-        alert('Réservation non trouvée');
+        alert('Booking not found');
         return;
     }
     
@@ -592,7 +592,7 @@ function editBookingFromDay(bookingId) {
 
 // Delete booking
 async function deleteBooking(bookingId) {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')) {
+    if (!confirm('Are you sure you want to delete this booking?')) {
         return;
     }
     
@@ -603,19 +603,19 @@ async function deleteBooking(bookingId) {
         
         if (response.ok) {
             await loadBookings();
-            alert('Réservation supprimée avec succès');
+            alert('Booking deleted successfully');
         } else {
-            alert('Erreur lors de la suppression de la réservation');
+            alert('Error deleting the booking');
         }
     } catch (error) {
         console.error('Error deleting booking:', error);
-        alert('Erreur lors de la suppression de la réservation');
+        alert('Error deleting the booking');
     }
 }
 
 // Delete booking from day details modal
 async function deleteBookingFromDay(bookingId) {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')) {
+    if (!confirm('Are you sure you want to delete this booking?')) {
         return;
     }
     
@@ -627,13 +627,13 @@ async function deleteBookingFromDay(bookingId) {
         if (response.ok) {
             closeModal();
             await loadBookings();
-            alert('Réservation supprimée avec succès');
+            alert('Booking deleted successfully');
         } else {
-            alert('Erreur lors de la suppression de la réservation');
+            alert('Error deleting the booking');
         }
     } catch (error) {
         console.error('Error deleting booking:', error);
-        alert('Erreur lors de la suppression de la réservation');
+        alert('Error deleting the booking');
     }
 }
 
@@ -641,11 +641,11 @@ async function deleteBookingFromDay(bookingId) {
 async function confirmBooking(bookingId) {
     const booking = bookings.find(b => b.id === bookingId);
     if (!booking) {
-        alert('Réservation non trouvée');
+        alert('Booking not found');
         return;
     }
     
-    if (!confirm('Confirmer cette réservation ?')) {
+    if (!confirm('Confirm this booking?')) {
         return;
     }
     
@@ -667,14 +667,14 @@ async function confirmBooking(bookingId) {
         
         if (response.ok) {
             await loadBookings();
-            alert('Réservation confirmée avec succès !');
+            alert('Booking confirmed successfully!');
         } else {
             const error = await response.json();
-            alert(error.error || 'Erreur lors de la confirmation de la réservation');
+            alert(error.error || 'Error confirming the booking');
         }
     } catch (error) {
         console.error('Error confirming booking:', error);
-        alert('Erreur lors de la confirmation de la réservation');
+        alert('Error confirming the booking');
     }
 }
 
@@ -718,11 +718,11 @@ function formatDate(date) {
 
 function formatDateLong(date) {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    return date.toLocaleDateString('fr-FR', options);
+    return date.toLocaleDateString('en-US', options);
 }
 
 function logout() {
-    if (confirm('Voulez-vous vraiment vous déconnecter ?')) {
+    if (confirm('Are you sure you want to log out?')) {
         window.location.href = '/logout';
     }
 }

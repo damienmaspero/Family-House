@@ -103,7 +103,7 @@ def login():
             session['logged_in'] = True
             return redirect(url_for('calendar'))
         else:
-            flash('Mot de passe incorrect. Veuillez contacter un membre de la famille pour vous rappeler le mot de passe.', 'error')
+            flash('Incorrect password. Please contact a family member to get the password.', 'error')
     
     return render_template('login.html')
 
@@ -168,7 +168,7 @@ def create_booking():
     
     # Validation
     if not check_in_date or not check_out_date or not name or not guests:
-        return jsonify({'error': 'Tous les champs sont requis (check_in_date, check_out_date, name, guests)'}), 400
+        return jsonify({'error': 'All fields are required (check_in_date, check_out_date, name, guests)'}), 400
     
     # Validate dates
     try:
@@ -176,22 +176,22 @@ def create_booking():
         check_out = datetime.strptime(check_out_date, '%Y-%m-%d')
         
         if check_out <= check_in:
-            return jsonify({'error': 'La date de départ doit être après la date d\'arrivée'}), 400
+            return jsonify({'error': 'Check-out date must be after check-in date'}), 400
         
         # Check that the booking is at least 1 night
         nights = (check_out - check_in).days
         if nights < 1:
-            return jsonify({'error': 'La réservation doit être d\'au moins une nuit'}), 400
+            return jsonify({'error': 'The booking must be at least one night'}), 400
             
     except ValueError:
-        return jsonify({'error': 'Format de date invalide. Utilisez YYYY-MM-DD'}), 400
+        return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
     
     try:
         guests = int(guests)
         if guests < 1 or guests > MAX_CAPACITY:
-            return jsonify({'error': f'Le nombre de personnes doit être entre 1 et {MAX_CAPACITY}'}), 400
+            return jsonify({'error': f'Number of guests must be between 1 and {MAX_CAPACITY}'}), 400
     except ValueError:
-        return jsonify({'error': 'Nombre de personnes invalide'}), 400
+        return jsonify({'error': 'Invalid number of guests'}), 400
     
     # Check capacity for each night in the range (only for confirmed bookings)
     # Request bookings don't count against capacity
@@ -218,12 +218,8 @@ def create_booking():
                 db.close()
                 remaining = MAX_CAPACITY - total_guests
                 return jsonify({
-                    'error': f'Capacité dépassée pour la nuit du {night}. Il reste seulement {remaining} place(s) pour cette nuit.'
+                    'error': f'Capacity exceeded for the night of {night}. Only {remaining} spot(s) remaining for that night.'
                 }), 400
-        
-        db.close()
-    
-    # Create booking
     db = get_db()
     cursor = db.execute(
         'INSERT INTO bookings (check_in_date, check_out_date, name, guests, is_request, comment) VALUES (?, ?, ?, ?, ?, ?)',
@@ -283,7 +279,7 @@ def update_booking(booking_id):
     
     # Validation
     if not check_in_date or not check_out_date or not name or not guests:
-        return jsonify({'error': 'Tous les champs sont requis (check_in_date, check_out_date, name, guests)'}), 400
+        return jsonify({'error': 'All fields are required (check_in_date, check_out_date, name, guests)'}), 400
     
     # Validate dates
     try:
@@ -291,22 +287,22 @@ def update_booking(booking_id):
         check_out = datetime.strptime(check_out_date, '%Y-%m-%d')
         
         if check_out <= check_in:
-            return jsonify({'error': 'La date de départ doit être après la date d\'arrivée'}), 400
+            return jsonify({'error': 'Check-out date must be after check-in date'}), 400
         
         # Check that the booking is at least 1 night
         nights = (check_out - check_in).days
         if nights < 1:
-            return jsonify({'error': 'La réservation doit être d\'au moins une nuit'}), 400
+            return jsonify({'error': 'The booking must be at least one night'}), 400
             
     except ValueError:
-        return jsonify({'error': 'Format de date invalide. Utilisez YYYY-MM-DD'}), 400
+        return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
     
     try:
         guests = int(guests)
         if guests < 1 or guests > MAX_CAPACITY:
-            return jsonify({'error': f'Le nombre de personnes doit être entre 1 et {MAX_CAPACITY}'}), 400
+            return jsonify({'error': f'Number of guests must be between 1 and {MAX_CAPACITY}'}), 400
     except ValueError:
-        return jsonify({'error': 'Nombre de personnes invalide'}), 400
+        return jsonify({'error': 'Invalid number of guests'}), 400
     
     # Check capacity for each night in the range, excluding the current booking
     # Only check capacity for confirmed bookings
@@ -316,7 +312,7 @@ def update_booking(booking_id):
     existing = db.execute('SELECT * FROM bookings WHERE id = ?', (booking_id,)).fetchone()
     if not existing:
         db.close()
-        return jsonify({'error': 'Réservation non trouvée'}), 404
+        return jsonify({'error': 'Booking not found'}), 404
     
     if not is_request:
         # Generate all nights between check_in and check_out (excluding check_out day)
@@ -339,7 +335,7 @@ def update_booking(booking_id):
                 db.close()
                 remaining = MAX_CAPACITY - total_guests
                 return jsonify({
-                    'error': f'Capacité dépassée pour la nuit du {night}. Il reste seulement {remaining} place(s) pour cette nuit.'
+                    'error': f'Capacity exceeded for the night of {night}. Only {remaining} spot(s) remaining for that night.'
                 }), 400
     
     # Update booking
