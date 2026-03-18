@@ -1,0 +1,738 @@
+{% extends "base.html" %}
+
+{% block title %}Calendrier{% endblock %}
+
+{% block content %}
+<div class="calendar-container">
+    <header class="app-header">
+        <h1>Family House</h1>
+        <button onclick="logout()" class="btn btn-logout">Déconnexion</button>
+    </header>
+    
+    <div class="calendar-section">
+        <h2>Calendrier des réservations</h2>
+        
+        <div class="calendar-controls">
+            <button onclick="previousMonth()" class="btn btn-nav">‹ Précédent</button>
+            <h3 id="current-month">Janvier 2026</h3>
+            <button onclick="nextMonth()" class="btn btn-nav">Suivant ›</button>
+        </div>
+        
+        <div id="calendar-grid" class="calendar-grid">
+            <!-- Calendar will be generated here by JavaScript -->
+        </div>
+    </div>
+    
+    <div class="bookings-section">
+        <h2>Prochaines réservations</h2>
+        <div id="bookings-list" class="bookings-list">
+            <!-- Bookings will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<!-- Booking Modal (content dynamically generated) -->
+<div id="booking-modal" class="modal"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentMonth = new Date();
+let bookings = [];
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    loadBookings();
+    renderCalendar();
+});
+
+// Load bookings from server
+async function loadBookings() {
+    try {
+        const response = await fetch('/api/bookings');
+        bookings = await response.json();
+        renderCalendar();
+        renderBookingsList();
+    } catch (error) {
+        console.error('Error loading bookings:', error);
+    }
+}
+
+// Get all nights for a booking (dates between check_in and check_out, excluding check_out)
+function getBookingNights(booking) {
+    const nights = [];
+    const checkIn = parseLocalDate(booking.check_in_date);
+    const checkOut = parseLocalDate(booking.check_out_date);
+    
+    let current = new Date(checkIn);
+    while (current < checkOut) {
+        nights.push(formatDate(current));
+        current.setDate(current.getDate() + 1);
+    }
+    
+    return nights;
+}
+
+// Get only confirmed bookings for a night (excluding requests)
+function getConfirmedBookings(dateStr) {
+    return bookings.filter(b => {
+        if (b.is_request) return false; // Exclude request bookings
+        const nights = getBookingNights(b);
+        return nights.includes(dateStr);
+    });
+}
+
+// Get request bookings for a night
+function getRequestBookings(dateStr) {
+    return bookings.filter(b => {
+        if (!b.is_request) return false; // Only request bookings
+        const nights = getBookingNights(b);
+        return nights.includes(dateStr);
+    });
+}
+
+// Render calendar
+function renderCalendar() {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    
+    // Update month title
+    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+                       'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    document.getElementById('current-month').textContent = `${monthNames[month]} ${year}`;
+    
+    // Get first day of month and number of days
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    // Create calendar grid with weekdays integrated into each cell
+    let html = '<div class="calendar-days">';
+    
+    // Empty cells before first day
+    for (let i = 0; i < startingDayOfWeek; i++) {
+        html += '<div class="calendar-day empty"></div>';
+    }
+    
+    // Nights of month - each cell represents a night from day N to day N+1
+    const today = new Date();
+    const weekdays = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month, day);
+        const dateStr = formatDate(date);
+        const dayOfWeek = weekdays[date.getDay()];
+        
+        // Calculate the next date for display
+        const nextDate = new Date(year, month, day + 1);
+        const nextDay = nextDate.getDate();
+        const nextDayOfWeek = weekdays[nextDate.getDay()];
+        
+        // Find confirmed and request bookings separately
+        const confirmedBookings = getConfirmedBookings(dateStr);
+        const requestBookings = getRequestBookings(dateStr);
+        const allDayBookings = [...confirmedBookings, ...requestBookings];
+        
+        const totalGuests = confirmedBookings.reduce((sum, b) => sum + b.guests, 0);
+        const requestGuests = requestBookings.reduce((sum, b) => sum + b.guests, 0);
+        
+        let classes = 'calendar-day';
+        if (date.toDateString() === today.toDateString()) {
+            classes += ' today';
+        }
+        if (allDayBookings.length > 0) {
+            classes += ' booked';
+        }
+        if (totalGuests >= 15) {
+            classes += ' full';
+        }
+        if (date < today && date.toDateString() !== today.toDateString()) {
+            classes += ' past';
+        }
+        
+        html += `<div class="${classes}" onclick="selectDate('${dateStr}')">`;
+        html += `<div class="day-number">${dayOfWeek} ${day} → ${nextDayOfWeek} ${nextDay}</div>`;
+        if (allDayBookings.length > 0) {
+            html += `<div class="booking-info">`;
+            allDayBookings.forEach((booking, index) => {
+                if (index < 2) {  // Show max 2 bookings
+                    const requestClass = booking.is_request ? ' booking-request' : '';
+                    html += `<div class="booking-item-mini${requestClass}">`;
+                    html += `<span class="booking-name">${booking.name}</span>`;
+                    html += ` <span class="booking-guests">(${booking.guests})</span>`;
+                    if (booking.is_request) {
+                        html += ` <span class="request-badge">demande</span>`;
+                    }
+                    html += `</div>`;
+                }
+            });
+            if (allDayBookings.length > 2) {
+                html += `<div class="booking-more">+${allDayBookings.length - 2} autre(s)</div>`;
+            }
+            let capacityText = `${totalGuests}/15 pers.`;
+            if (requestGuests > 0) {
+                capacityText += ` (+${requestGuests} demande)`;
+            }
+            html += `<div class="booking-capacity">${capacityText}</div>`;
+            html += `</div>`;
+        }
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    document.getElementById('calendar-grid').innerHTML = html;
+}
+
+// Render bookings list
+function renderBookingsList() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const upcomingBookings = bookings
+        .filter(b => parseLocalDate(b.check_in_date) >= today)
+        .sort((a, b) => parseLocalDate(a.check_in_date) - parseLocalDate(b.check_in_date))
+        .slice(0, 10);
+    
+    let html = '';
+    if (upcomingBookings.length === 0) {
+        html = '<p class="no-bookings">Aucune réservation à venir</p>';
+    } else {
+        upcomingBookings.forEach(booking => {
+            const checkIn = parseLocalDate(booking.check_in_date);
+            const checkOut = parseLocalDate(booking.check_out_date);
+            const nights = Math.floor((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+            const requestClass = booking.is_request ? ' booking-request-item' : '';
+            html += `
+                <div class="booking-item${requestClass}">
+                    <div class="booking-date">
+                        ${formatDateLong(checkIn)} → ${formatDateLong(checkOut)}
+                        <br><small>(${nights} nuit${nights > 1 ? 's' : ''})</small>
+                        ${booking.is_request ? '<br><span class="request-badge-large">DEMANDE</span>' : ''}
+                    </div>
+                    <div class="booking-details">
+                        <strong>${booking.name}</strong> - ${booking.guests} personne${booking.guests > 1 ? 's' : ''}
+                        ${booking.comment ? `<br><em class="booking-comment">${booking.comment}</em>` : ''}
+                    </div>
+                    <div class="booking-actions">
+                        ${booking.is_request ? `<button onclick="confirmBooking(${booking.id})" class="btn btn-confirm">Confirmer</button>` : ''}
+                        <button onclick="editBooking(${booking.id})" class="btn btn-edit">Modifier</button>
+                        <button onclick="deleteBooking(${booking.id})" class="btn btn-delete">Supprimer</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    document.getElementById('bookings-list').innerHTML = html;
+}
+
+// Date selection
+function selectDate(dateStr) {
+    const date = parseLocalDate(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Don't allow booking past dates
+    if (date < today) {
+        alert('Impossible de réserver une date passée');
+        return;
+    }
+    
+    // Find all bookings that include this night (both confirmed and request)
+    const confirmedBookings = getConfirmedBookings(dateStr);
+    const requestBookings = getRequestBookings(dateStr);
+    const allBookings = [...confirmedBookings, ...requestBookings];
+    
+    if (allBookings.length > 0) {
+        // Show day details modal with all bookings
+        showDayDetailsModal(dateStr, allBookings);
+    } else {
+        // Open booking modal with this date as check-in
+        showBookingModal(dateStr);
+    }
+}
+
+// Show day details with all bookings
+function showDayDetailsModal(dateStr, dayBookings) {
+    const date = parseLocalDate(dateStr);
+    const confirmedBookings = dayBookings.filter(b => !b.is_request);
+    const requestBookings = dayBookings.filter(b => b.is_request);
+    const totalGuests = confirmedBookings.reduce((sum, b) => sum + b.guests, 0);
+    const requestGuests = requestBookings.reduce((sum, b) => sum + b.guests, 0);
+    const remaining = 15 - totalGuests;
+    
+    let html = `
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>Réservations pour la nuit du ${formatDateLong(date)}</h2>
+            
+            <div class="day-summary">
+                <p><strong>Capacité:</strong> ${totalGuests}/15 personnes (${remaining} place(s) restante(s))</p>
+                ${requestGuests > 0 ? `<p><strong>Demandes:</strong> ${requestGuests} personne(s) en demande</p>` : ''}
+            </div>
+            
+            <div class="day-bookings-list">
+                <h3>Réservations:</h3>
+    `;
+    
+    dayBookings.forEach(booking => {
+        const checkIn = parseLocalDate(booking.check_in_date);
+        const checkOut = parseLocalDate(booking.check_out_date);
+        const nights = Math.floor((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+        const requestClass = booking.is_request ? ' booking-request-item' : '';
+        html += `
+            <div class="day-booking-item${requestClass}">
+                <div>
+                    <strong>${booking.name}</strong> - ${booking.guests} personne${booking.guests > 1 ? 's' : ''}
+                    ${booking.is_request ? '<span class="request-badge-large">DEMANDE</span>' : ''}
+                    <br><small>Du ${formatDateLong(checkIn)} au ${formatDateLong(checkOut)} (${nights} nuit${nights > 1 ? 's' : ''})</small>
+                    ${booking.comment ? `<br><em class="booking-comment">${booking.comment}</em>` : ''}
+                </div>
+                <div class="booking-actions">
+                    ${booking.is_request ? `<button onclick="confirmBookingFromDay(${booking.id})" class="btn btn-confirm">Confirmer</button>` : ''}
+                    <button onclick="editBookingFromDay(${booking.id})" class="btn btn-edit">Modifier</button>
+                    <button onclick="deleteBookingFromDay(${booking.id})" class="btn btn-delete">Supprimer</button>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    
+    if (remaining > 0) {
+        html += `
+            <div class="modal-actions">
+                <button onclick="showBookingModal('${dateStr}')" class="btn btn-primary">
+                    Ajouter une réservation
+                </button>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    
+    const modal = document.getElementById('booking-modal');
+    modal.innerHTML = html;
+    modal.style.display = 'block';
+}
+
+// Show booking form modal
+function showBookingModal(checkInDateStr, bookingId = null) {
+    let booking = null;
+    let checkInDate, checkOutDate, checkOutDateStr;
+    
+    // If bookingId is provided, we're editing an existing booking
+    if (bookingId) {
+        booking = bookings.find(b => b.id === bookingId);
+        if (!booking) {
+            alert('Réservation non trouvée');
+            return;
+        }
+        checkInDate = parseLocalDate(booking.check_in_date);
+        checkOutDate = parseLocalDate(booking.check_out_date);
+        checkOutDateStr = booking.check_out_date;
+    } else {
+        // Creating a new booking
+        checkInDate = parseLocalDate(checkInDateStr);
+        // Default check-out is the next day (1 night)
+        checkOutDate = new Date(checkInDate);
+        checkOutDate.setDate(checkOutDate.getDate() + 1);
+        checkOutDateStr = formatDate(checkOutDate);
+    }
+    
+    const title = bookingId ? 'Modifier la réservation' : 'Nouvelle réservation';
+    const submitLabel = bookingId ? 'Mettre à jour' : 'Réserver';
+    const isRequest = booking ? booking.is_request : false;
+    const bookingIdParam = bookingId !== undefined && bookingId !== null ? String(bookingId) : 'null';
+    
+    // We'll check capacity dynamically when dates change
+    const html = `
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>${title}</h2>
+            
+            <form id="booking-form" onsubmit="submitBooking(event, ${bookingIdParam})">
+                <div class="form-group">
+                    <label for="booking-check-in">Date d'arrivée</label>
+                    <input 
+                        type="date" 
+                        id="booking-check-in" 
+                        name="check_in_date" 
+                        value="${formatDate(checkInDate)}"
+                        required
+                        onchange="updateCapacityInfo(${bookingIdParam})"
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <label for="booking-check-out">Date de départ</label>
+                    <input 
+                        type="date" 
+                        id="booking-check-out" 
+                        name="check_out_date" 
+                        value="${checkOutDateStr}"
+                        required
+                        onchange="updateCapacityInfo(${bookingIdParam})"
+                    >
+                </div>
+                
+                <div id="capacity-info" class="capacity-info">
+                    <p><em>Sélectionnez les dates pour voir la disponibilité</em></p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="booking-name">Nom</label>
+                    <input 
+                        type="text" 
+                        id="booking-name" 
+                        name="name" 
+                        required
+                        placeholder="Votre nom"
+                        value="${booking ? booking.name : ''}"
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <label for="booking-guests">Nombre de personnes</label>
+                    <input 
+                        type="number" 
+                        id="booking-guests" 
+                        name="guests" 
+                        min="1" 
+                        max="15" 
+                        required
+                        placeholder="Ex: 4"
+                        value="${booking ? booking.guests : ''}"
+                    >
+                </div>
+                
+                <div class="form-group">
+                    <label for="booking-comment">Commentaire (Optionnel)</label>
+                    <textarea 
+                        id="booking-comment" 
+                        name="comment" 
+                        rows="3"
+                        placeholder="Ajoutez un commentaire..."
+                    >${booking ? (booking.comment || '') : ''}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input 
+                            type="checkbox" 
+                            id="booking-request" 
+                            name="is_request"
+                            ${isRequest ? 'checked' : ''}
+                            onchange="updateCapacityInfo(${bookingIdParam})"
+                        >
+                        <span>Enregistrer comme demande (ne compte pas dans la capacité)</span>
+                    </label>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" onclick="closeModal()" class="btn btn-secondary">Annuler</button>
+                    <button type="submit" class="btn btn-primary">${submitLabel}</button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    const modal = document.getElementById('booking-modal');
+    modal.innerHTML = html;
+    modal.style.display = 'block';
+    
+    // Update capacity info initially
+    updateCapacityInfo(bookingId);
+}
+
+// Update capacity information based on selected dates
+function updateCapacityInfo(excludeBookingId = null) {
+    const checkInInput = document.getElementById('booking-check-in');
+    const checkOutInput = document.getElementById('booking-check-out');
+    const capacityInfoDiv = document.getElementById('capacity-info');
+    const guestsInput = document.getElementById('booking-guests');
+    const requestCheckbox = document.getElementById('booking-request');
+    
+    if (!checkInInput || !checkOutInput || !capacityInfoDiv || !guestsInput) return;
+    
+    const checkInDate = parseLocalDate(checkInInput.value);
+    const checkOutDate = parseLocalDate(checkOutInput.value);
+    const isRequest = requestCheckbox ? requestCheckbox.checked : false;
+    
+    // Validate dates
+    if (checkOutDate <= checkInDate) {
+        capacityInfoDiv.innerHTML = '<p class="error">La date de départ doit être après la date d\'arrivée</p>';
+        guestsInput.max = 0;
+        return;
+    }
+    
+    const nights = Math.floor((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+    
+    // If it's a request, capacity is not checked
+    if (isRequest) {
+        capacityInfoDiv.innerHTML = `
+            <p><strong>${nights} nuit${nights > 1 ? 's' : ''}</strong></p>
+            <p class="info-message">Mode demande : la capacité n'est pas vérifiée</p>
+        `;
+        guestsInput.max = 15;
+        return;
+    }
+    
+    // Check capacity for each night, excluding the booking being edited if applicable
+    let minCapacity = 15;
+    let currentDate = new Date(checkInDate);
+    
+    while (currentDate < checkOutDate) {
+        const dateStr = formatDate(currentDate);
+        
+        // Calculate capacity manually from bookings array, excluding the current booking and request bookings
+        const nightBookings = bookings.filter(b => {
+            if (b.is_request) return false; // Exclude request bookings from capacity
+            if (excludeBookingId && b.id === excludeBookingId) {
+                return false; // Exclude the booking being edited
+            }
+            const nights = getBookingNights(b);
+            return nights.includes(dateStr);
+        });
+        
+        const totalGuests = nightBookings.reduce((sum, b) => sum + b.guests, 0);
+        const remaining = 15 - totalGuests;
+        
+        if (remaining < minCapacity) {
+            minCapacity = remaining;
+        }
+        
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    guestsInput.max = minCapacity;
+    
+    if (minCapacity > 0) {
+        capacityInfoDiv.innerHTML = `
+            <p><strong>${nights} nuit${nights > 1 ? 's' : ''}</strong></p>
+            <p><strong>Places disponibles:</strong> ${minCapacity}/15 (minimum sur toutes les nuits)</p>
+        `;
+    } else {
+        capacityInfoDiv.innerHTML = `
+            <p><strong>${nights} nuit${nights > 1 ? 's' : ''}</strong></p>
+            <p class="error">Aucune place disponible pour cette période</p>
+        `;
+    }
+}
+
+// Submit booking
+async function submitBooking(event, bookingId = null) {
+    event.preventDefault();
+    
+    const checkInDate = document.getElementById('booking-check-in').value;
+    const checkOutDate = document.getElementById('booking-check-out').value;
+    const name = document.getElementById('booking-name').value;
+    const guests = document.getElementById('booking-guests').value;
+    const isRequest = document.getElementById('booking-request').checked;
+    const comment = document.getElementById('booking-comment').value;
+    
+    // Validate dates
+    if (parseLocalDate(checkOutDate) <= parseLocalDate(checkInDate)) {
+        alert('La date de départ doit être après la date d\'arrivée');
+        return;
+    }
+    
+    const method = bookingId ? 'PUT' : 'POST';
+    const url = bookingId ? `/api/bookings/${bookingId}` : '/api/bookings';
+    const successMessage = bookingId ? 'Réservation modifiée avec succès !' : 'Réservation créée avec succès !';
+    
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                check_in_date: checkInDate,
+                check_out_date: checkOutDate,
+                name: name,
+                guests: parseInt(guests),
+                is_request: isRequest,
+                comment: comment
+            })
+        });
+        
+        if (response.ok) {
+            closeModal();
+            await loadBookings();
+            alert(successMessage);
+        } else {
+            const error = await response.json();
+            alert(error.error || 'Erreur lors de la sauvegarde de la réservation');
+        }
+    } catch (error) {
+        console.error('Error saving booking:', error);
+        alert('Erreur lors de la sauvegarde de la réservation');
+    }
+}
+
+// Edit booking
+function editBooking(bookingId) {
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!booking) {
+        alert('Réservation non trouvée');
+        return;
+    }
+    
+    // Open booking modal in edit mode
+    showBookingModal(booking.check_in_date, bookingId);
+}
+
+// Edit booking from day details modal
+function editBookingFromDay(bookingId) {
+    closeModal();
+    editBooking(bookingId);
+}
+
+// Delete booking
+async function deleteBooking(bookingId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/bookings/${bookingId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            await loadBookings();
+            alert('Réservation supprimée avec succès');
+        } else {
+            alert('Erreur lors de la suppression de la réservation');
+        }
+    } catch (error) {
+        console.error('Error deleting booking:', error);
+        alert('Erreur lors de la suppression de la réservation');
+    }
+}
+
+// Delete booking from day details modal
+async function deleteBookingFromDay(bookingId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/bookings/${bookingId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            closeModal();
+            await loadBookings();
+            alert('Réservation supprimée avec succès');
+        } else {
+            alert('Erreur lors de la suppression de la réservation');
+        }
+    } catch (error) {
+        console.error('Error deleting booking:', error);
+        alert('Erreur lors de la suppression de la réservation');
+    }
+}
+
+// Confirm a request booking (convert to confirmed)
+async function confirmBooking(bookingId) {
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!booking) {
+        alert('Réservation non trouvée');
+        return;
+    }
+    
+    if (!confirm('Confirmer cette réservation ?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/bookings/${bookingId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                check_in_date: booking.check_in_date,
+                check_out_date: booking.check_out_date,
+                name: booking.name,
+                guests: booking.guests,
+                is_request: false,
+                comment: booking.comment || ''
+            })
+        });
+        
+        if (response.ok) {
+            await loadBookings();
+            alert('Réservation confirmée avec succès !');
+        } else {
+            const error = await response.json();
+            alert(error.error || 'Erreur lors de la confirmation de la réservation');
+        }
+    } catch (error) {
+        console.error('Error confirming booking:', error);
+        alert('Erreur lors de la confirmation de la réservation');
+    }
+}
+
+// Confirm booking from day details modal
+async function confirmBookingFromDay(bookingId) {
+    closeModal();
+    await confirmBooking(bookingId);
+}
+
+// Modal functions
+function closeModal() {
+    document.getElementById('booking-modal').style.display = 'none';
+}
+
+// Calendar navigation
+function previousMonth() {
+    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+    renderCalendar();
+}
+
+function nextMonth() {
+    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+    renderCalendar();
+}
+
+// Utility functions
+function parseLocalDate(dateStr) {
+    // Parse a YYYY-MM-DD string as local midnight (not UTC)
+    // This prevents timezone-related off-by-one errors
+    const parts = dateStr.split('-');
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+}
+
+function formatDate(date) {
+    // Format date as YYYY-MM-DD in local time (not UTC)
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function formatDateLong(date) {
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    return date.toLocaleDateString('fr-FR', options);
+}
+
+function logout() {
+    if (confirm('Voulez-vous vraiment vous déconnecter ?')) {
+        window.location.href = '/logout';
+    }
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('booking-modal');
+    if (event.target === modal) {
+        closeModal();
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Connexion{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <h1>Family House</h1>
+    <h2>Connexion</h2>
+    
+    <form method="POST" action="{{ url_for('login') }}" class="login-form">
+        <div class="form-group">
+            <label for="password">Mot de passe</label>
+            <input 
+                type="password" 
+                id="password" 
+                name="password" 
+                required 
+                autofocus
+                placeholder="Entrez le mot de passe"
+            >
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Se connecter</button>
+    </form>
+</div>
+{% endblock %}
